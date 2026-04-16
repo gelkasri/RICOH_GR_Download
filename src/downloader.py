@@ -6,16 +6,18 @@ Image download management
 import os
 import shutil
 import urllib
+import time
 from urllib import request
 from queue import Queue
 from typing import Optional
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from log_config import logger
 from src.camera import RicohCamera
 from src.config import (REQUEST_TIMEOUT, DEFAULT_DEST_DIR,
                         API_HOST, API_PHOTO_LIST,
-                        RAW_EXTENSION, JPG_EXTENSION)
+                        RAW_EXTENSION, JPG_EXTENSION, MAX_WORKERS, USE_MULTI_THREADING)
 
 
 class Downloader:
@@ -90,6 +92,7 @@ class Downloader:
                 file_list.append(os.path.join(str(root), str(f)).replace(self.dest_dir, ""))
         return file_list
 
+
     def download(self, queue: Optional[Queue] = None) -> bool:
         """
         Downloading all photos, applying filters (JPG/RAW/transfer status)
@@ -104,37 +107,95 @@ class Downloader:
 
         if not self.camera.set_photo_list(): return False
         if self.raw_only:
-            photos_to_download = self.camera.get_photos(ext=RAW_EXTENSION, to_transfer_only=self.to_transfer_only,
+            photos_filtered = self.camera.get_photos(ext=RAW_EXTENSION, to_transfer_only=self.to_transfer_only,
                                               directory=self.dir_to_transfer)
         elif self.jpg_only:
-            photos_to_download = self.camera.get_photos(ext=JPG_EXTENSION, to_transfer_only=self.to_transfer_only,
+            photos_filtered = self.camera.get_photos(ext=JPG_EXTENSION, to_transfer_only=self.to_transfer_only,
                                               directory=self.dir_to_transfer)
         else:
-            photos_to_download = self.camera.get_photos(to_transfer_only=self.to_transfer_only,
+            photos_filtered = self.camera.get_photos(to_transfer_only=self.to_transfer_only,
                                               directory=self.dir_to_transfer)
-        count = 0
-        transferred = 0
-        total_file = len(photos_to_download)
+        total_files = len(photos_filtered)
+        if total_files == 0:
+            logger.info("No photos to download.")
+            return True
         self._remote_file_list.clear()
-        for photo in photos_to_download:
+        for photo in photos_filtered:
             remote_path = str(Path(photo["dir"]) / photo["filename"]).replace("\\", "/")
             self._remote_file_list.append(f"/{remote_path}")
         try:
             self._local_files_list = self._get_dest_dir_files()
         except OSError:
             return False
-        for file in self._remote_file_list:
+        photos_to_download = [
+            file for file in self._remote_file_list
+            if Path(file).as_posix() not in self._local_files_list
+        ]
+        skipped_files = total_files - len(photos_to_download)
+        logger.info(f"{skipped_files} files already exist. Downloading {len(photos_to_download)} new files.")
+        start_time = time.time()
+        if USE_MULTI_THREADING:
+            logger.debug(f"Multi-threading activated, max workers = {MAX_WORKERS}")
+            self.multi_thread_download(photos_to_download, queue)
+        else:
+           self.single_thread_download(photos_to_download, queue)
+        end_time = time.time()
+        logger.debug(f"Download time : {end_time - start_time} seconds")
+        return True
+
+    def single_thread_download(self,photos_to_download: list, queue: Optional[Queue] = None) -> bool:
+        """Downloading all photos, applying filters (JPG/RAW/transfer status)
+        Args:
+            photos_to_download: Photos to download (after filtering)
+            queue: Queue object used in GUI mode for send transfer progression and logs
+
+        Returns:
+        """
+        count = 0
+        transferred = 0
+        total_file = len(photos_to_download)
+        if queue is not None: queue.put(0)
+        for file in photos_to_download:
             count += 1
-            remote_path = Path(file).as_posix()
-            if remote_path in self._local_files_list:
-                logger.info(f"{count}/{total_file} - Skipping {file} (already exists)")
-            else:
-                logger.info(f"{count}/{total_file} - Downloading {file}" )
-                self._download_photo(file, self.dest_dir)
-                transferred +=1
+            logger.info(f"{count}/{total_file} - Downloading {file}" )
+            if self._download_photo(file, self.dest_dir):
+                transferred += 1
             progress = int(count/total_file*100) if total_file > 0 else 0
             if queue is not None: queue.put(progress) # To send progress to the interface
-        logger.info(f"Download finished : {transferred} pictures transferred, {count - transferred} skipped")
+        logger.info(f"Download finished : {transferred} pictures transferred, {total_file - transferred} failed")
+        return True
+
+
+    def multi_thread_download(self, photos_to_download:list ,queue: Optional[Queue] = None) -> bool:
+        """Downloading all photos, applying filters (JPG/RAW/transfer status), using threads
+        Args:
+            photos_to_download: Photos to download (after filtering)
+            queue: Queue object used in GUI mode for send transfer progression and logs
+
+        Returns: True on success, False on failure
+        """
+        count = 0
+        transferred = 0
+        total_file = len(photos_to_download)
+        if queue is not None: queue.put(0)
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            # Submit all download tasks
+            future_to_file = {
+                executor.submit(self._download_photo, file, self.dest_dir): file
+                for file in photos_to_download
+            }
+            # Process completed futures as they finish
+            for future in as_completed(future_to_file):
+                file = future_to_file[future]
+                try:
+                    if future.result():
+                        transferred += 1
+                    progress = int((transferred / len(photos_to_download)) * 100) if photos_to_download else 0
+                    if queue is not None: queue.put(progress) # To send progress to the interface
+                    logger.info(f"Downloaded {file} ({transferred}/{len(photos_to_download)})")
+                except Exception as e:
+                    logger.error(f"Failed to download {file}: {e}")
+        logger.info(f"Download finished : {transferred} pictures transferred, {total_file - transferred} failed")
         return True
 
 
@@ -142,8 +203,8 @@ class Downloader:
         """
         Download a photo to the destination directory
         Args:
-            param photo: path of the photo to download
-            param destination: local directory to save the photo
+            photo: path of the photo to download
+            destination: local directory to save the photo
 
         Returns:
             True on success, False on failure

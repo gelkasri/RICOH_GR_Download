@@ -35,6 +35,10 @@ SUPPORTED_DEVICES = [
 # --- Timeouts and network settings ---
 REQUEST_TIMEOUT = 5                                 # Timeout for HTTP requests (in seconds)
 
+# --- Threading settings for download
+USE_MULTI_THREADING = True
+MAX_WORKERS = 2
+
 # --- Logging level (can be DEBUG, INFO, WARNING, ERROR, CRITICAL)
 LOG_LEVEL = logging.INFO
 
