@@ -64,6 +64,8 @@ class Downloader:
         self.dest_dir = os.path.normpath(os.path.expanduser(self.dest_dir))
         self._local_files_list = []
         self._remote_file_list = []
+        # List of photos selected in the GUI
+        self.gui_selected_photos = None
 
 
     def _get_dest_dir_files(self) -> list:
@@ -96,6 +98,7 @@ class Downloader:
     def download(self, queue: Optional[Queue] = None) -> bool:
         """
         Downloading all photos, applying filters (JPG/RAW/transfer status)
+        Downloading all photos, applying filters (JPG/RAW/transfer status/photos selected in GUI)
         Args:
             queue: Queue object used in GUI mode for send transfer progression and logs
         Returns:
@@ -115,6 +118,11 @@ class Downloader:
         else:
             photos_filtered = self.camera.get_photos(to_transfer_only=self.to_transfer_only,
                                               directory=self.dir_to_transfer)
+        if self.gui_selected_photos is not None:
+            photos_selected = []
+            for photo in photos_filtered:
+                if photo.get('path') in self.gui_selected_photos: photos_selected.append(photo)
+            photos_filtered = photos_selected
         total_files = len(photos_filtered)
         if total_files == 0:
             logger.info("No photos to download.")

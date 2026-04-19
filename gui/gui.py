@@ -20,6 +20,7 @@ from src.config import (GUI_TITLE, GUI_GEOM, GUI_RESIZABLE_W, GUI_RESIZABLE_H,
                         ALL_EXTENSIONS, JPG_EXTENSION, RAW_EXTENSION, GUI_GEOM_X,
                         GUI_COLOR_CONNECTION_KO, GUI_COLOR_CONNECTION_OK, GUI_QUEUE_MAJ_MS)
 from src.downloader import Downloader
+from .select_photos import SelectPhotos
 
 
 def destroy_widgets_in_frame(frame: ttk.Frame) -> None:
@@ -239,7 +240,8 @@ class GUI:
         ttk.Checkbutton(f_opt_flag, text="Uniquement photos avec flag de transfert",
                         variable=self._to_transfer_only).pack(anchor="nw")
         ttk.Frame(f_opt_flag).pack(fill="x", expand=True)
-        ttk.Button(f_opt_flag, text="Sélectionner les photos à transférer").pack(anchor="sw")
+        ttk.Button(f_opt_flag, text="Sélectionner les photos à transférer",
+                   command=self._select_photos_to_transfer).pack(anchor="sw")
 
 
     def _create_transfer_frame(self, parent: ttk.Frame) -> None:
@@ -268,3 +270,7 @@ class GUI:
         f_disconnect = ttk.LabelFrame(parent)
         f_disconnect.pack(fill="x", expand=False, padx=5, pady=5, side="top")
         ttk.Button(f_disconnect, text="Déconnecter l'appareil", command=self._shutdown).pack(pady=10, side="left")
+
+
+    def _select_photos_to_transfer(self) -> None:
+        self._selected_photos = SelectPhotos(self.downloader)
