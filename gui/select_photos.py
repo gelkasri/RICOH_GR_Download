@@ -31,7 +31,11 @@ class SelectPhotos:
                    command=lambda: self._update_selection(down)).pack(pady=10, anchor='center')
         ttk.Button(self.f_button, text="Annuler",
                    command=lambda: self._cancel_selection(down)).pack(pady=10, anchor='center')
-        self._fill_treeview()
+        try:
+            self._fill_treeview()
+        except AttributeError:
+            logger.debug(f"No photos to display")
+            pass
         self.root.mainloop()
 
 

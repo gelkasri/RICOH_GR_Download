@@ -183,6 +183,7 @@ class GUI:
         self.notebook.pack(fill="both", expand=True)
 
         self._create_transfer_tab()
+        self._refresh_connection_indic()
 
 
     def _create_transfer_tab(self) -> None:
@@ -209,7 +210,6 @@ class GUI:
         ttk.Frame(f_connect).pack(fill="x", expand=False, padx=50, side="left") # Margin between the two Frames
         self._f_cam_info = ttk.Frame(f_connect)
         self._f_cam_info.pack(expand=False, padx=5, pady=5, side="left")
-        self._refresh_connection_indic()
 
 
     def _create_directory_frame(self, parent: ttk.Frame) -> None:
