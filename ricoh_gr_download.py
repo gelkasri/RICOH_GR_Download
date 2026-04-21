@@ -32,6 +32,8 @@ def parse_args():
                         help="Transfer only RAW files")
     parser.add_argument("-t", "--to-transfer", action="store_true",
                         help="Transfer only photos marked as 'To Transfer' on the camera")
+    parser.add_argument("-s", "--low-def", action="store_true",
+                        help="Transfer photos in low definition (720x480, approx. 60 Ko)")
     parser.add_argument("-D", "--dir-to-transfer", type=str,
                         help="Camera directory to transfer")
     parser.add_argument("-n", "--no-gui", action="store_true",
@@ -66,6 +68,7 @@ def main() -> int:
         jpg_only=args.jpg_only,
         raw_only=args.raw_only,
         to_transfer_only=args.to_transfer,
+        low_def=args.low_def,
         dir_to_transfer=args.dir_to_transfer,
         camera=c,
     )

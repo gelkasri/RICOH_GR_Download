@@ -24,6 +24,10 @@ ALL_EXTENSIONS = "ALL"
 
 # --- Default Settings ---
 DEFAULT_DEST_DIR = Path.home() / "Pictures" / "GR_Downloads"    # Default destination folder
+LOW_DEF_DIR = "/lowdef"                                         # If low definition option is activated
+SIZE_THUMB_QUERY = "?size=thumb"
+SIZE_VIEW_QUERY = "?size=view"
+SIZE_XS_QUERY = "?size=xs"
 
 # --- Supported devices ---
 # Only tested on Ricoh GR III

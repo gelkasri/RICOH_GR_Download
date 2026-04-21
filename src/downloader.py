@@ -17,7 +17,8 @@ from log_config import logger
 from src.camera import RicohCamera
 from src.config import (REQUEST_TIMEOUT, DEFAULT_DEST_DIR,
                         API_HOST, API_PHOTO_LIST,
-                        RAW_EXTENSION, JPG_EXTENSION, MAX_WORKERS, USE_MULTI_THREADING)
+                        RAW_EXTENSION, JPG_EXTENSION, MAX_WORKERS, USE_MULTI_THREADING, LOW_DEF_DIR, SIZE_THUMB_QUERY,
+                        SIZE_VIEW_QUERY)
 
 
 class Downloader:
@@ -39,6 +40,7 @@ class Downloader:
                  jpg_only: bool = False,
                  raw_only: bool = False,
                  to_transfer_only: bool = False,
+                 low_def: bool = False,
                  dir_to_transfer: str = None,
                  camera: RicohCamera = None,
                  ):
@@ -56,6 +58,7 @@ class Downloader:
         self.jpg_only = jpg_only
         self.raw_only = raw_only
         self.to_transfer_only = to_transfer_only
+        self.low_def = low_def
         self.dir_to_transfer = dir_to_transfer
         if dest_dir is None:
             self.dest_dir = DEFAULT_DEST_DIR
@@ -141,6 +144,9 @@ class Downloader:
         ]
         skipped_files = total_files - len(photos_to_download)
         logger.info(f"{skipped_files} files already exist. Downloading {len(photos_to_download)} new files.")
+        if self.low_def :
+            logger.debug("Low definition activated")
+
         start_time = time.time()
         if USE_MULTI_THREADING:
             logger.debug(f"Multi-threading activated, max workers = {MAX_WORKERS}")
@@ -182,7 +188,6 @@ class Downloader:
 
         Returns: True on success, False on failure
         """
-        count = 0
         transferred = 0
         total_file = len(photos_to_download)
         if queue is not None: queue.put(0)
@@ -218,9 +223,17 @@ class Downloader:
             True on success, False on failure
         """
         try:
-            resp = urllib.request.urlopen(API_HOST + API_PHOTO_LIST + photo, timeout=self.timeout)
-            os.makedirs(os.path.dirname(destination+photo), exist_ok=True)
-            dest_path = Path(destination) / photo.lstrip("/")
+            if not self.low_def :
+                resp = urllib.request.urlopen(API_HOST + API_PHOTO_LIST + photo, timeout=self.timeout)
+                os.makedirs(os.path.dirname(destination+photo), exist_ok=True)
+                dest_path = Path(destination) / photo.lstrip("/")
+            else:
+                size = SIZE_THUMB_QUERY if '.DNG' in photo else SIZE_VIEW_QUERY
+                destination = destination + LOW_DEF_DIR
+                resp = urllib.request.urlopen(API_HOST + API_PHOTO_LIST + photo + size, timeout=self.timeout)
+                os.makedirs(os.path.dirname(destination+photo), exist_ok=True)
+                new_photo_name = photo + ".thumb.jpg"
+                dest_path = Path(destination) / new_photo_name.lstrip("/")
             with open(dest_path, "wb") as newfile:
                 shutil.copyfileobj(resp, newfile)
             return True

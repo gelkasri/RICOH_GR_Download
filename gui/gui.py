@@ -58,6 +58,7 @@ class GUI:
         else:
             self._ext_choice.set(RAW_EXTENSION)
         self._to_transfer_only = tk.BooleanVar(value=self.downloader.to_transfer_only)
+        self._lowdef_download = tk.BooleanVar(value=self.downloader.low_def)
         self._v_progress = tk.IntVar(value=0)
         self._v_progress_label = f"Progression du transfert : {self._v_progress.get()}%"
 
@@ -165,6 +166,7 @@ class GUI:
         ext = self._ext_choice.get()
         self.downloader.raw_only = (ext == RAW_EXTENSION)
         self.downloader.jpg_only = (ext == JPG_EXTENSION)
+        self.downloader.low_def = self._lowdef_download.get()
         if not self._refresh_connection_indic():
             tk.messagebox.showwarning(title="Aucun appareil connecté",
                                       message="Aucun appareil connecté",
@@ -239,9 +241,11 @@ class GUI:
         f_opt_flag.pack(fill="y", expand=False, padx=5, pady=5, side="left")
         ttk.Checkbutton(f_opt_flag, text="Uniquement photos avec flag de transfert",
                         variable=self._to_transfer_only).pack(anchor="nw")
-        ttk.Frame(f_opt_flag).pack(fill="x", expand=True)
+        ttk.Checkbutton(f_opt_flag, text="Téléchargement basse définition",
+                        variable=self._lowdef_download).pack(anchor="nw")
         ttk.Button(f_opt_flag, text="Sélectionner les photos à transférer",
                    command=self._select_photos_to_transfer).pack(anchor="sw")
+        ttk.Frame(f_opt_flag).pack(fill="x", expand=True)
 
 
     def _create_transfer_frame(self, parent: ttk.Frame) -> None:
