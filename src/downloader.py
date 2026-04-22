@@ -100,7 +100,6 @@ class Downloader:
 
     def download(self, queue: Optional[Queue] = None) -> bool:
         """
-        Downloading all photos, applying filters (JPG/RAW/transfer status)
         Downloading all photos, applying filters (JPG/RAW/transfer status/photos selected in GUI)
         Args:
             queue: Queue object used in GUI mode for send transfer progression and logs
@@ -138,9 +137,10 @@ class Downloader:
             self._local_files_list = self._get_dest_dir_files()
         except OSError:
             return False
+        # Filters photos that are already present locally to not download them again (except for low def photos)
         photos_to_download = [
             file for file in self._remote_file_list
-            if Path(file).as_posix() not in self._local_files_list
+            if (Path(file).as_posix() not in self._local_files_list or self.low_def)
         ]
         skipped_files = total_files - len(photos_to_download)
         logger.info(f"{skipped_files} files already exist. Downloading {len(photos_to_download)} new files.")

@@ -123,7 +123,7 @@ class GUI:
 
     def _choose_directory(self) -> None:
         """
-        Periodically checks the log queue and displays new messages in the GUI
+        Choose destination directory for photos to transfer
         """
         directory = filedialog.askdirectory(initialdir=self._dest_dir.get(),
                                             title="Choisissez le répertoire de destination")
@@ -146,7 +146,8 @@ class GUI:
     def _start_download(self) -> None:
         """
         Start the photo transfer process
-        Updates downloader settings (extension, transfer flags) and starts the download in a thread
+        Updates downloader settings (extension, transfer flags, destination directory)
+        and starts the download in a thread
         Called by the "Start transfer" button
         Uses a Queue to receive progress updates from the Downloader thread
         """
@@ -167,6 +168,7 @@ class GUI:
         self.downloader.raw_only = (ext == RAW_EXTENSION)
         self.downloader.jpg_only = (ext == JPG_EXTENSION)
         self.downloader.low_def = self._lowdef_download.get()
+        self.downloader.dest_dir = self._dest_dir.get()
         if not self._refresh_connection_indic():
             tk.messagebox.showwarning(title="Aucun appareil connecté",
                                       message="Aucun appareil connecté",
@@ -219,7 +221,6 @@ class GUI:
         f_dir = ttk.LabelFrame(parent, text="Choix du répertoire de destination")
         f_dir.pack(fill="x", expand=False, padx=5, pady=5, side="top")
         ttk.Label(f_dir, text="Répertoire de destination : ").pack(pady=10, side="left")
-        # TODO: ne fonctionne pas quand on écrit le chemin à la main
         ttk.Entry(f_dir, textvariable=self._dest_dir).pack(pady=10, side="left", fill="x", expand=True)
         ttk.Button(f_dir, text="Parcourir", command=self._choose_directory).pack(pady=10, padx=5, side="left")
 
