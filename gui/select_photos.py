@@ -13,7 +13,7 @@ from PIL.ImageTk import PhotoImage, Image
 
 from log_config import logger
 from src.config import API_HOST, API_PHOTO_LIST, SIZE_THUMB_QUERY, SIZE_VIEW_QUERY, REQUEST_TIMEOUT, THUMB_SIZE_X, \
-    THUMB_SIZE_Y, MAX_ROW_THUMB, THUMB_PADY, SELECT_PHOTO_GUI_SIZE, THUMB_PADX
+    THUMB_SIZE_Y, MAX_ROW_THUMB, THUMB_PADY, SELECT_PHOTO_GUI_SIZE, THUMB_PADX, THUMB_BATCH_SIZE
 from src.downloader import Downloader
 
 
@@ -41,10 +41,11 @@ class SelectPhotos:
                    command=lambda: self._cancel_selection(down)).pack(pady=10, anchor='center', side='left')
         self.f_button.pack(side='bottom', anchor='center')
         try:
-            self._fill_treeview()
+            self._fill_treeview_without_previews()
+            self.current_photo_index = 0
+            self._load_next_batch()
         except AttributeError:
-            logger.debug(f"No photos to display")
-            pass
+            logger.error(f"Unable to load photos: device not connected")
         self.root.wait_window()
 
 
@@ -67,6 +68,7 @@ class SelectPhotos:
 
 
     def _fill_treeview(self) -> None:
+        """Unused"""
         for photo in self.photos:
             size = SIZE_THUMB_QUERY if '.DNG' in photo else SIZE_VIEW_QUERY
             url = API_HOST + API_PHOTO_LIST + '/' + photo.get('path') + size
@@ -82,6 +84,71 @@ class SelectPhotos:
                                       tags=photo.get('path'),
                                       image=self.thumb[-1]
                                       )
+
+    def _fill_treeview_without_previews(self) -> None:
+        """Remplit le Treeview avec les métadonnées (sans les previews)."""
+        for photo in self.photos:
+            self.tv_photo_list.insert(
+                "",'end',
+                values=[photo.get('ext'), photo.get('dir'), photo.get('filename')],
+                tags=photo.get('path'),
+            )
+
+    def _load_next_preview(self) -> None:
+        """Unused
+        Load and display the next preview asynchronously."""
+        if self.current_photo_index < len(self.photos):
+            photo = self.photos[self.current_photo_index]
+            size = SIZE_THUMB_QUERY if '.DNG' in photo else SIZE_VIEW_QUERY
+            url = API_HOST + API_PHOTO_LIST + '/' + photo.get('path') + size
+
+            try:
+                resp = urllib.request.urlopen(url, timeout=REQUEST_TIMEOUT)
+                img = Image.open(resp)
+                image = PhotoImage(img.resize((THUMB_SIZE_X, THUMB_SIZE_Y)))
+                self.thumb.append(image)
+
+                # Updates the corresponding row in the Treeview
+                item_id = self.tv_photo_list.get_children()[self.current_photo_index]
+                self.tv_photo_list.item(item_id, image=image)
+
+                self.current_photo_index += 1
+                # Schedules the next image to load after a short delay
+                self.root.after(50, self._load_next_preview)
+
+            except urllib.error.URLError:
+                logger.error(f"Unable to load preview: URL error {url}")
+                self.current_photo_index += 1
+                self.root.after(30, self._load_next_preview)
+
+    def _load_next_batch(self) -> None:
+        """Load a batch of previews asynchronously."""
+        batch_end = min(self.current_photo_index + THUMB_BATCH_SIZE, len(self.photos))
+
+        # Load all images from current batch
+        for i in range(self.current_photo_index, batch_end):
+            photo = self.photos[i]
+            size = SIZE_THUMB_QUERY if '.DNG' in photo else SIZE_VIEW_QUERY
+            url = API_HOST + API_PHOTO_LIST + '/' + photo.get('path') + size
+
+            try:
+                resp = urllib.request.urlopen(url, timeout=REQUEST_TIMEOUT)
+                img = Image.open(resp)
+                image = PhotoImage(img.resize((THUMB_SIZE_X, THUMB_SIZE_Y)))
+                self.thumb.append(image)
+
+                # Updates the corresponding row in the Treeview
+                item_id = self.tv_photo_list.get_children()[i]
+                self.tv_photo_list.item(item_id, image=image)
+
+            except urllib.error.URLError:
+                logger.error(f"Unable to load preview: URL error {url}")
+                self.thumb.append(None)
+
+        # Updates index and schedules next batch
+        self.current_photo_index = batch_end
+        if self.current_photo_index < len(self.photos):
+            self.root.after(30, self._load_next_batch)
 
 
     def _update_selection(self, down:Downloader) -> None:
